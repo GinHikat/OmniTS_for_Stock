@@ -11,3 +11,4 @@ mplfinance
 plotply
 statmodels
 bs4
+pywt
