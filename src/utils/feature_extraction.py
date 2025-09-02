@@ -1,0 +1,135 @@
+import pandas as pd
+import numpy as np
+import sys, os
+
+import ta
+
+def EMA(series: pd.Series, period: int = 12) -> pd.Series:
+    ema = series.ewm(span=period, adjust=False).mean()
+    ema.iloc[:period-1] = np.nan  # mask first values
+    return ema
+
+def stochastic_oscillator(df, k_period=14, d_period=3):
+    # Highest high & lowest low over the lookback window
+    low_min = df['Low'].rolling(window=k_period).min()
+    high_max = df['High'].rolling(window=k_period).max()
+    
+    # %K line
+    k_percent = 100 * (df['Close'] - low_min) / (high_max - low_min)
+    
+    # %D line (moving average of %K)
+    d_percent = k_percent.rolling(window=d_period).mean()
+    
+    return k_percent, d_percent
+
+class Feature:
+    def __init__(self):
+        pass
+    
+    def technical_analysis(self, df) -> pd.DataFrame:
+        ''''
+        Extract Technical Analysis features from the given columns: OHLC, Date and Volume
+        
+        Parameters:
+        df: df with OHLC, Date and Volume columns
+        
+        Returns:
+        output: Currently RSI, MACD, MFI, Stochastic Oscillator, Adjusted Close and Log Return
+        
+        Note: 
+        1. RSI: Relative Strength Index
+        2. MACD: Moving Average Convergence Divergence
+        3. MFI: Money Flow Index
+        4. Stochastic Oscillator: Stochastic Oscillator
+        5. Adjusted Close: Adjusted Close Price
+        6. Log Return: Log Return
+        7. Realized Volatility: Parkinson volatility, Rogers-Satchell volatility
+        
+        With the given basic Stock attribute OHLC, we can assume Adjusted Close Price to be approximately similar to Close Price
+        When further attributed are present in the datasets like Intradays, Stock Splits/ Reverse Splits, Dividends, spin-offs, rights offering, mergers....
+        '''
+        
+        #RSI
+        df["RSI"] = ta.momentum.RSIIndicator(df["NFLX_Close"], window=14).rsi()
+        
+        #MACD
+        df['EMA_12'] = EMA(df['NFLX_Close'], period=12)
+        df['EMA_26'] = EMA(df['NFLX_Close'], period=26)
+        df['MACD'] = df['EMA_12'] - df['EMA_26']
+        df['Signal_Line'] = EMA(df['MACD'], period=9)
+        
+        #MFI
+        df['TP'] = (df['NFLX_High'] + df['NFLX_Low'] + df['NFLX_Close']) / 3
+
+        df['MF'] = df['TP'] * df['NFLX_Volume']
+
+        df['PMF'] = np.where(df['TP'] > df['TP'].shift(1), df['MF'], 0)
+        df['NMF'] = np.where(df['TP'] < df['TP'].shift(1), df['MF'], 0)
+
+        df['PMF_sum'] = df['PMF'].rolling(window=14).sum()
+        df['NMF_sum'] = df['NMF'].rolling(window=14).sum()  
+
+        df['MR'] = df['PMF_sum'] / df['NMF_sum']
+        df['MFI'] = 100 - (100 / (1 + df['MR']))
+        
+        #Stochastic Oscillator
+        df['%K'], df['%D'] = stochastic_oscillator(df, k_period=14, d_period=3)
+        
+        #Adjusted Close
+        df['Adjusted_Close_Price'] = df['Close']
+        
+        # Log Return
+        df["LogRet"] = np.log(df["Adjusted_Close_Price"] / df["Adjusted_Close_Price"].shift(1))
+        
+        #Realized Volatility
+            #Parkinson volatility
+        df["ParkinsonVol"] = (1 / (4*np.log(2))) * (np.log(df["High"] / df["Low"]))**2
+
+            # Rogers-Satchell volatility
+        df["RSVol"] = (np.log(df["High"]/df["Close"]) * np.log(df["High"]/df["Open"]) +
+                    np.log(df["Low"]/df["Close"]) * np.log(df["Low"]/df["Open"]))
+
+        return df
+        
+    
+    def candle_plot(self, df) -> pd.DataFrame:
+        '''
+        Treat the OHLC data as 1 daily Candle in the Japanese Candle Model. The function identifies and extract special Sign Candles based on predefined rules
+        
+        Parameter: 
+        df: Input dataframe, contains OHCL data, Date and Volume data for 1 individual Stock Index
+        
+        Return: 
+        pd.DataFrame: dataframe with Corresponding binary signals for each Candle column (expected), treating these binary Candle signals as features for Models
+        '''
+        
+        
+        return df
+    
+    def date_extraction(self, df) -> pd.DataFrame:
+        
+        df['Date'] = pd.to_datetime(df['Date'])
+        df['Year'] = df['Date'].dt.year
+        df['Month'] = df['Date'].dt.month
+        df['Weekday'] = df['Date'].dt.weekday 
+        return df
+    
+    def pseudo_hht(self, df, col) -> pd.DataFrame:
+        ''''
+        A brief application of Hilbert-Huang Transform, applying the EMD-HSA framework and take the resulting series as features for Models
+        
+        Parameter: 
+        df: Input dataframe, contains OHCL data, Date and Volume data for 1 individual Stock Index
+        col: Column name of the Close data, this is treated as the Noisy input signal
+
+        Return:
+        pd.DataFrame: dataframe with EMD-HSA ouput, containing
+        - The Hilbert Transform of each IMFs (from EMD or other variants)
+        - The Instantaneous Frequency (IF) of each IMFs
+        - The Instantaneous Amplitude (IA) of each IMFs
+        
+        each of these will increase in number according to level of decompositions (or number of extracted IMF from EMD phase)
+        '''
+        
+        
+        return df
