@@ -1,0 +1,7 @@
+README.md
+setup.py
+OmniTS.egg-info/PKG-INFO
+OmniTS.egg-info/SOURCES.txt
+OmniTS.egg-info/dependency_links.txt
+OmniTS.egg-info/requires.txt
+OmniTS.egg-info/top_level.txt

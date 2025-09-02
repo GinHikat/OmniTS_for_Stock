@@ -1,3 +1,4 @@
+
 class Dimensional_Denoise:
     def __init__(self):
         pass
