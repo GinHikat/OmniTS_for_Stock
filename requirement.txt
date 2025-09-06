@@ -13,3 +13,4 @@ statsmodels
 bs4
 PyWavelets
 -e .
+hampel
