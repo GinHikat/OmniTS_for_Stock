@@ -43,15 +43,17 @@ def extract_index(index: str) -> pd.DataFrame:
     try:
         df = pd.read_csv(data_path)
 
-        stock = df.filter(regex = f"^{index}")
-        
+        stock = df.filter(regex = f"^{index}_(Open|High|Low|Close|Volume)").copy()
+                
         stock.columns = stock.columns.str.split('_').str[1]
-           
+        
+        stock['Date'] = df['Date']  
+                 
         return stock
     
     except FileNotFoundError:
         raise FileNotFoundError("The file 'index_data.csv' was not found in the current directory.")
     
-if __name__ == "__main__":
-    df = extract_index("ABBV")
-    print(df.head())
+# if __name__ == "__main__":
+#     df = extract_index("ABBV")
+#     print(df.head())

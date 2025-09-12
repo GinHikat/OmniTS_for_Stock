@@ -4,6 +4,10 @@ import sys, os
 
 import ta
 
+from PyEMD.EMD import EMD
+from scipy.signal import hilbert
+
+
 def EMA(series: pd.Series, period: int = 12) -> pd.Series:
     ema = series.ewm(span=period, adjust=False).mean()
     ema.iloc[:period-1] = np.nan  # mask first values
@@ -114,7 +118,7 @@ class Feature:
         df['Weekday'] = df['Date'].dt.weekday 
         return df
     
-    def pseudo_hht(self, df, col) -> pd.DataFrame:
+    def pseudo_hht(self, df, col, t_col) -> pd.DataFrame:
         ''''
         A brief application of Hilbert-Huang Transform, applying the EMD-HSA framework and take the resulting series as features for Models
         
@@ -129,7 +133,28 @@ class Feature:
         - The Instantaneous Amplitude (IA) of each IMFs
         
         each of these will increase in number according to level of decompositions (or number of extracted IMF from EMD phase)
-        '''
         
+        Note: As other variants of EMD (like CEEMDAN, ICEEMDAN, etc) are not implementable in Python PyEMD, we will only use the basic EMD here.
+        '''
+        signal = df[col].values 
+
+        emd = EMD()
+        imfs = emd(signal)
+        
+        df[t_col] = pd.to_datetime(df[t_col])
+        
+        analytic_imfs = hilbert(imfs, axis=1)
+        amplitude_envelope = np.abs(analytic_imfs)
+        instantaneous_phase = np.unwrap(np.angle(analytic_imfs))
+        
+        t = (df[t_col] - df[t_col].iloc[0]).dt.total_seconds().to_numpy()
+
+        instantaneous_frequency = np.diff(instantaneous_phase, axis=1) / (2.0*np.pi*np.diff(t)[0])
+        
+        for i in range(imfs.shape[0]):
+            df[f'IMF_{i+1}'] = imfs[i]
+            df[f'IMF_{i+1}_Hilbert'] = analytic_imfs[i]
+            df[f'IMF_{i+1}_Instant_Amplitude'] = amplitude_envelope[i]
+            df[f'IMF_{i+1}_Instant_Freq'] = np.append(instantaneous_frequency[i], np.nan)
         
         return df
