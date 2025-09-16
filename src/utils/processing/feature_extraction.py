@@ -54,18 +54,18 @@ class Feature:
         '''
         
         #RSI
-        df["RSI"] = ta.momentum.RSIIndicator(df["NFLX_Close"], window=14).rsi()
+        df["RSI"] = ta.momentum.RSIIndicator(df["Close"], window=14).rsi()
         
         #MACD
-        df['EMA_12'] = EMA(df['NFLX_Close'], period=12)
-        df['EMA_26'] = EMA(df['NFLX_Close'], period=26)
+        df['EMA_12'] = EMA(df['Close'], period=12)
+        df['EMA_26'] = EMA(df['Close'], period=26)
         df['MACD'] = df['EMA_12'] - df['EMA_26']
         df['Signal_Line'] = EMA(df['MACD'], period=9)
         
         #MFI
-        df['TP'] = (df['NFLX_High'] + df['NFLX_Low'] + df['NFLX_Close']) / 3
+        df['TP'] = (df['High'] + df['Low'] + df['Close']) / 3
 
-        df['MF'] = df['TP'] * df['NFLX_Volume']
+        df['MF'] = df['TP'] * df['Volume']
 
         df['PMF'] = np.where(df['TP'] > df['TP'].shift(1), df['MF'], 0)
         df['NMF'] = np.where(df['TP'] < df['TP'].shift(1), df['MF'], 0)
@@ -79,6 +79,13 @@ class Feature:
         #Stochastic Oscillator
         df['%K'], df['%D'] = stochastic_oscillator(df, k_period=14, d_period=3)
         
+        #Boilinger Bands
+        df['SMA20'] = df['Close'].rolling(window=20).mean()
+        df['STD20'] = df['Close'].rolling(window=20).std()
+        
+        df['boilinger_up'] = df['SMA20'] + 2* df['STD20']
+        df['boilinger_down'] = df['SMA20'] - 2* df['STD20']
+            
         #Adjusted Close
         df['Adjusted_Close_Price'] = df['Close']
         
@@ -93,9 +100,8 @@ class Feature:
         df["RSVol"] = (np.log(df["High"]/df["Close"]) * np.log(df["High"]/df["Open"]) +
                     np.log(df["Low"]/df["Close"]) * np.log(df["Low"]/df["Open"]))
 
-        return df
+        return df.drop(['TP', 'MF', 'PMF', 'NMF', 'MR'], axis = 1)
         
-    
     def candle_plot(self, df) -> pd.DataFrame:
         '''
         Treat the OHLC data as 1 daily Candle in the Japanese Candle Model. The function identifies and extract special Sign Candles based on predefined rules
@@ -157,4 +163,10 @@ class Feature:
             df[f'IMF_{i+1}_Instant_Amplitude'] = amplitude_envelope[i]
             df[f'IMF_{i+1}_Instant_Freq'] = np.append(instantaneous_frequency[i], np.nan)
         
+        return df
+    
+    def apply_all(self, df) -> pd.DataFrame:
+        df = self.technical_analysis(df)
+        df = self.date_extraction(df)
+        df = self.pseudo_hht(df, 'Close', 'Date')
         return df
