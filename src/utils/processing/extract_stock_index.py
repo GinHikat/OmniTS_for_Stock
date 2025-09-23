@@ -47,7 +47,7 @@ def extract_index(index: str) -> pd.DataFrame:
                 
         stock.columns = stock.columns.str.split('_').str[1]
         
-        stock['Date'] = df['Date']  
+        stock['Date'] = pd.to_datetime(df['Date'])
                  
         return stock
     
